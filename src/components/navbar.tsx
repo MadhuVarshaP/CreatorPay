@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -67,10 +67,13 @@ export default function Navbar() {
           </Link>
         </nav>
 
-        <Button variant="outline" size="sm">
+        {/* <Button variant="outline" size="sm">
           Connect Wallet
-        </Button>
+        </Button> */}
+        <ConnectButton />
+       
       </div>
     </header>
   )
 }
+
