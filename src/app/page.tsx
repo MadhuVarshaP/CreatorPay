@@ -21,7 +21,7 @@ export default function Home() {
         
         <div className="flex justify-center gap-4">
           <Link href="/register">
-            <Button size="lg" className="font-semibold">
+            <Button size="lg" className="font-semibold bg-black text-white">
               Register as Creator
             </Button>
           </Link>
@@ -34,13 +34,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Wallet connection status */}
-      {isConnected && (
-        <div className="max-w-md mx-auto mb-12 p-4 bg-muted rounded-lg text-center">
-          <p className="font-medium">Connected wallet:</p>
-          <p className="font-mono text-sm break-all">{address}</p>
-        </div>
-      )}
+    
 
       {/* Creators Section */}
       <section className="py-12">

@@ -1,32 +1,87 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { creatorDashboardData } from "@/lib/mock-data"
 import { formatEth } from "@/lib/utils"
+import { useAccount } from "wagmi"
+import { toast, Toaster } from "sonner"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
 
 export default function CreatorDashboard() {
+  const { isConnected } = useAccount()
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const { address, subscriptionFee, platformShare, totalEarnings, subscribers } = creatorDashboardData
 
+  useEffect(() => {
+    // Check if wallet is connected when component mounts
+    if (!isConnected) {
+      toast.warning("Wallet required", {
+        description: "Please connect your wallet to access the creator dashboard",
+        duration: 5000,
+      })
+    }
+  }, [isConnected])
+
   const handleWithdraw = async () => {
+    if (!isConnected) {
+      toast.error("Wallet not connected", {
+        description: "Please connect your wallet to withdraw funds",
+        duration: 5000,
+      })
+   
+      return
+    }
+
     setIsWithdrawing(true)
-    // Simulate API call to withdraw funds
+    
     try {
+      // Show a loading toast
+      const toastId = toast.loading("Processing withdrawal...", {
+        duration: 10000, // Longer duration for loading state
+      })
+      
+      // Simulate API call to withdraw funds
       // In a real app, this would be a call to your smart contract
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      alert("Withdrawal successful!")
+      
+      // Dismiss the loading toast and show success toast
+      toast.dismiss(toastId)
+      toast.success("Withdrawal successful!", {
+        description: `${formatEth(totalEarnings)} ETH has been withdrawn to your wallet`,
+        duration: 5000,
+      })
     } catch (error) {
       console.error("Error withdrawing funds:", error)
-      alert("Withdrawal failed. Please try again.")
+      toast.error("Withdrawal failed", {
+        description: "There was an error processing your withdrawal. Please try again.",
+        duration: 5000,
+      })
     } finally {
       setIsWithdrawing(false)
     }
   }
 
+  if (!isConnected) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <Toaster position="bottom-right" closeButton richColors />
+        <h1 className="text-3xl font-bold mb-6">Creator Dashboard</h1>
+        <Card>
+          <CardContent className="py-10 flex flex-col items-center justify-center">
+            <p className="mb-6">Please connect your wallet to access the creator dashboard</p>
+            {/* <Button onClick={() => openConnectModal?.()}>Connect Wallet</Button> */}
+            <ConnectButton />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
+      <Toaster position="bottom-right" closeButton richColors />
       <h1 className="text-3xl font-bold mb-8">Creator Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -67,7 +122,7 @@ export default function CreatorDashboard() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button onClick={handleWithdraw} disabled={isWithdrawing || totalEarnings <= 0} className="w-full">
+            <Button onClick={handleWithdraw} disabled={isWithdrawing || totalEarnings <= 0} className="w-full bg-black text-white">
               {isWithdrawing ? "Processing..." : "Withdraw Earnings"}
             </Button>
           </CardFooter>

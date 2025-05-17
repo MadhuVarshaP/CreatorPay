@@ -49,7 +49,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         </div>
       </CardContent>
       <CardFooter>
-        <Button className="w-full" onClick={handleSubscribe} disabled={isSubscribing}>
+        <Button className="w-full bg-black text-white" onClick={handleSubscribe} disabled={isSubscribing}>
           {isSubscribing ? "Processing..." : "Subscribe"}
         </Button>
       </CardFooter>
