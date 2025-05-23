@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -12,11 +11,12 @@ import { Slider } from "@/components/ui/slider"
 import { useAccount, useChainId, usePublicClient } from "wagmi"
 import { toast, Toaster } from "sonner"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { parseEther } from "viem"
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { parseEther, formatEther } from "viem"
+import { useWriteContract, useWaitForTransactionReceipt, useSimulateContract } from "wagmi"
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Info } from "lucide-react"
+import { AlertCircle, Info, User } from "lucide-react"
+import { storeCreatorName } from "@/lib/creatorStorage"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -26,20 +26,32 @@ export default function RegisterPage() {
   
   const [fee, setFee] = useState<string>("0.01")
   const [platformShare, setPlatformShare] = useState<number>(10)
+  const [creatorName, setCreatorName] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [contractExists, setContractExists] = useState<boolean | null>(null)
   const [contractError, setContractError] = useState<string | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [detailedError, setDetailedError] = useState<string | null>(null)
+  const [gasEstimate, setGasEstimate] = useState<bigint | null>(null)
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState<boolean>(false)
+
+  // Simulate contract call to catch errors before actual transaction
+  const { data: simulateData, error: simulateError } = useSimulateContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: "registerCreator",
+    args: fee ? [parseEther(fee), BigInt(platformShare)] : undefined,
+    query: {
+      enabled: isConnected && !!fee && contractExists === true && !isAlreadyRegistered,
+    },
+  })
 
   const { writeContractAsync, data: hash, error: writeError } = useWriteContract()
   const { isLoading: txLoading, isSuccess } = useWaitForTransactionReceipt({ 
     hash,
     onSuccess: () => {
-      toast.success("Successfully registered as creator!")
-      setTimeout(() => router.push("/dashboard/creator"), 2000)
+      handleRegistrationSuccess()
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (error: { message: any }) => {
       toast.error("Transaction failed", {
         description: error?.message || "There was an error processing your transaction",
@@ -47,7 +59,71 @@ export default function RegisterPage() {
     }
   })
 
-  // Verify contract exists and has the expected functions
+  // Handle successful registration
+  const handleRegistrationSuccess = async () => {
+    if (!address) return
+
+    const trimmedName = creatorName.trim()
+    
+    if (trimmedName) {
+      // Store the creator name immediately
+      storeCreatorName(address, trimmedName)
+      
+      console.log(`✅ Registration successful! Stored name "${trimmedName}" for ${address}`)
+      
+      toast.success("Registration Successful!", {
+        description: `Welcome ${trimmedName}! Your creator profile has been set up.`,
+        duration: 4000,
+      })
+
+      // Try to set name on-chain if the contract supports it
+      try {
+        await setCreatorNameOnChain(trimmedName)
+      } catch (err) {
+        console.log("On-chain name setting failed, but local storage succeeded")
+      }
+    } else {
+      toast.success("Successfully registered as creator!")
+    }
+    
+    // Redirect after a short delay
+    setTimeout(() => {
+      router.push("/dashboard/creator")
+    }, 2000)
+  }
+
+  // Check if user is already registered
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!isConnected || !publicClient || !address) return
+      
+      try {
+        const creatorData = await publicClient.readContract({
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: "creators",
+          args: [address],
+        }) as [bigint, bigint, bigint, bigint]
+        
+        const isRegistered = creatorData[0] > 0n
+        setIsAlreadyRegistered(isRegistered)
+        
+        if (isRegistered) {
+          toast.warning("Already registered", {
+            description: "You are already registered as a creator",
+            duration: 5000,
+          })
+        }
+      } catch (err: any) {
+        console.error("Error checking registration status:", err)
+        setIsAlreadyRegistered(false)
+      }
+    }
+    
+    checkRegistration()
+  }, [isConnected, publicClient, address])
+
+  // Contract verification
   useEffect(() => {
     const verifyContract = async () => {
       if (!isConnected || !publicClient) return
@@ -55,7 +131,6 @@ export default function RegisterPage() {
       try {
         setContractError(null)
         
-        // Check if contract exists by getting its code
         const code = await publicClient.getBytecode({ address: CONTRACT_ADDRESS as `0x${string}` })
         
         if (!code || code === "0x") {
@@ -66,33 +141,95 @@ export default function RegisterPage() {
         
         setContractExists(true)
         
-        // Try to call a view function to verify ABI matches
         try {
-          // Get contract owner as a simple test
           const owner = await publicClient.readContract({
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "owner",
           })
           
-          setDebugInfo({ contractOwner: owner })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const subscriptionDuration = await publicClient.readContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: "subscriptionDuration",
+          })
+          
+          const totalPlatformFees = await publicClient.readContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: "totalPlatformFees",
+          })
+          
+          setDebugInfo({ 
+            contractOwner: owner,
+            subscriptionDuration: Number(subscriptionDuration),
+            totalPlatformFees: formatEther(totalPlatformFees as bigint),
+            chainId,
+            userAddress: address
+          })
+          
         } catch (err: any) {
           console.error("Error calling contract view function:", err)
-          setContractError(`Contract exists but ABI may not match. Error: ${err.message}`)
+          setContractError(`Contract exists but may not be compatible. Error: ${err.message}`)
         }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error("Error verifying contract:", err)
         setContractError(`Error verifying contract: ${err.message}`)
+        setContractExists(false)
       }
     }
     
     verifyContract()
-  }, [isConnected, chainId, publicClient])
+  }, [isConnected, chainId, publicClient, address])
+
+  // Gas estimation
+  useEffect(() => {
+    const estimateGas = async () => {
+      if (!isConnected || !publicClient || !fee || contractExists !== true || isAlreadyRegistered) return
+      
+      try {
+        const gas = await publicClient.estimateContractGas({
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: "registerCreator",
+          args: [parseEther(fee), BigInt(platformShare)],
+          account: address,
+        })
+        
+        setGasEstimate(gas)
+      } catch (err: any) {
+        console.error("Gas estimation failed:", err)
+      }
+    }
+    
+    estimateGas()
+  }, [isConnected, publicClient, fee, platformShare, contractExists, address, isAlreadyRegistered])
+
+  const setCreatorNameOnChain = async (name: string) => {
+    try {
+      const hasSetNameFunction = CONTRACT_ABI.some(
+        (item: any) => item.name === "setCreatorName" && item.type === "function"
+      )
+
+      if (hasSetNameFunction) {
+        console.log("Setting creator name on-chain...")
+        
+        await writeContractAsync({
+          abi: CONTRACT_ABI,
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          functionName: "setCreatorName",
+          args: [name],
+        })
+        
+        console.log("✅ Creator name set on-chain successfully!")
+      }
+    } catch (err: any) {
+      console.error("Error setting creator name on-chain:", err)
+      // Don't throw error - local storage is more important
+    }
+  }
 
   useEffect(() => {
-    // Check if wallet is connected when component mounts
     if (!isConnected) {
       toast.warning("Wallet required", {
         description: "Please connect your wallet to register as a creator",
@@ -104,10 +241,17 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
   
+    // Validation checks
     if (!isConnected) {
       toast.error("Wallet not connected", {
         description: "Please connect your wallet to complete registration",
-        duration: 5000,
+      })
+      return
+    }
+    
+    if (isAlreadyRegistered) {
+      toast.error("Already registered", {
+        description: "You are already registered as a creator",
       })
       return
     }
@@ -115,36 +259,88 @@ export default function RegisterPage() {
     if (contractError || contractExists === false) {
       toast.error("Contract issue", {
         description: contractError || "Contract not found on this network",
-        duration: 5000,
+      })
+      return
+    }
+
+    const trimmedName = creatorName.trim()
+    if (!trimmedName) {
+      toast.error("Creator name required", {
+        description: "Please enter a creator name to continue",
+      })
+      return
+    }
+
+    if (trimmedName.length < 2) {
+      toast.error("Name too short", {
+        description: "Creator name must be at least 2 characters long",
+      })
+      return
+    }
+
+    if (simulateError) {
+      toast.error("Transaction would fail", {
+        description: `Simulation failed: ${simulateError.message}`,
+        duration: 8000,
       })
       return
     }
   
     setIsSubmitting(true)
+    setDetailedError(null)
   
     try {
-      const toastId = toast.loading("Registering on-chain...")
+      const toastId = toast.loading(`Registering ${trimmedName} as creator...`)
       
       const feeInWei = parseEther(fee)
-      console.log("Debug - Registration params:", {
+      
+      console.log("🚀 Starting registration:", {
         address: CONTRACT_ADDRESS,
+        creatorName: trimmedName,
         fee: feeInWei.toString(),
-        platformShare: platformShare
+        platformShare: platformShare,
+        userAddress: address,
+        chainId
       })
-  
-      await writeContractAsync({
-        abi: CONTRACT_ABI,
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        functionName: "registerCreator",
-        args: [feeInWei, BigInt(platformShare)],
-      })
+
+      const txHash = await writeContractAsync(
+        simulateData?.request || {
+          abi: CONTRACT_ABI,
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          functionName: "registerCreator",
+          args: [feeInWei, BigInt(platformShare)],
+          ...(gasEstimate && { gas: gasEstimate + (gasEstimate / 10n) })
+        }
+      )
   
       toast.dismiss(toastId)
-      // Success toast will be shown by the transaction receipt hook
+      console.log("📝 Transaction submitted:", txHash)
+      
     } catch (err: any) {
-      console.error("Error registering creator:", err)
+      console.error("❌ Registration failed:", err)
+      
+      let errorMsg = "Registration failed. "
+      
+      if (err.cause?.reason) {
+        errorMsg += err.cause.reason
+      } else if (err.shortMessage) {
+        errorMsg += err.shortMessage
+      } else if (err.message) {
+        errorMsg += err.message
+      }
+      
+      if (errorMsg.toLowerCase().includes("already registered")) {
+        errorMsg = "You are already registered as a creator."
+        setIsAlreadyRegistered(true)
+      } else if (errorMsg.toLowerCase().includes("user rejected")) {
+        setIsSubmitting(false)
+        return // Don't show error for user rejection
+      }
+      
+      setDetailedError(errorMsg)
       toast.error("Registration failed", {
-        description: err.message || "There was an error during registration. Please try again.",
+        description: errorMsg,
+        duration: 8000,
       })
     } finally {
       setIsSubmitting(false)
@@ -157,7 +353,7 @@ export default function RegisterPage() {
         <Toaster position="bottom-right" closeButton richColors />
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl ">Register as Creator</CardTitle>
+            <CardTitle className="text-2xl">Register as Creator</CardTitle>
             <CardDescription>Connect your wallet to register</CardDescription>
           </CardHeader>
           <CardContent className="py-10 flex flex-col items-center justify-center">
@@ -180,12 +376,28 @@ export default function RegisterPage() {
           <AlertDescription>{contractError}</AlertDescription>
         </Alert>
       )}
+
+      {isAlreadyRegistered && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Already Registered</AlertTitle>
+          <AlertDescription>You are already registered as a creator on this network.</AlertDescription>
+        </Alert>
+      )}
+
+      {simulateError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Transaction Simulation Failed</AlertTitle>
+          <AlertDescription>{simulateError.message}</AlertDescription>
+        </Alert>
+      )}
       
-      {writeError && (
+      {(writeError || detailedError) && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Transaction Error</AlertTitle>
-          <AlertDescription>{writeError.message}</AlertDescription>
+          <AlertDescription>{detailedError || writeError?.message}</AlertDescription>
         </Alert>
       )}
       
@@ -194,18 +406,51 @@ export default function RegisterPage() {
           <Info className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-600">Success!</AlertTitle>
           <AlertDescription className="text-green-700">
-            You've successfully registered as a creator. Redirecting to dashboard...
+            Registration successful! Your creator profile has been set up. Redirecting...
           </AlertDescription>
         </Alert>
       )}
       
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Register as Creator</CardTitle>
-          <CardDescription>Set your subscription fee and platform share percentage</CardDescription>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <User className="h-6 w-6" />
+            Register as Creator
+          </CardTitle>
+          <CardDescription>
+            Create your creator profile with a custom name and subscription settings
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="creator" className="text-base font-medium">
+                Creator Name *
+              </Label>
+              <Input 
+                type="text" 
+                id="creator" 
+                placeholder="Enter your creator name (e.g., John Doe, Artist123, etc.)" 
+                value={creatorName}
+                onChange={(e) => setCreatorName(e.target.value)}
+                required 
+                minLength={2}
+                maxLength={50}
+                className="text-lg"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>This name will be displayed to subscribers</span>
+                <span>{creatorName.length}/50</span>
+              </div>
+              {creatorName.trim() && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    Preview: Your profile will show as "<strong>{creatorName.trim()}</strong>"
+                  </p>
+                </div>
+              )}
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="fee">Subscription Fee (ETH)</Label>
               <Input
@@ -219,7 +464,7 @@ export default function RegisterPage() {
                 required
               />
               <p className="text-sm text-muted-foreground">
-                This is the amount users will pay to subscribe to your content
+                Amount users will pay to subscribe to your content
               </p>
             </div>
             
@@ -231,30 +476,58 @@ export default function RegisterPage() {
               <Slider
                 id="platformShare"
                 min={1}
-                max={30}
+                max={100}
                 step={1}
                 value={[platformShare]}
                 onValueChange={(value) => setPlatformShare(value[0])}
                 className="my-4 rounded-full" 
               />
               <p className="text-sm text-muted-foreground">
-                Percentage of subscription fee that goes to the platform (max 30%)
+                Platform fee percentage (you keep {100 - platformShare}%)
               </p>
             </div>
             
-            {/* <div className="text-xs text-muted-foreground">
-              <p>Network ID: {chainId}</p>
-              <p>Contract: {CONTRACT_ADDRESS}</p>
-              <p>Wallet: {address}</p>
-            </div> */}
+            {/* Debug info - can be removed in production */}
+            {/* <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground">Debug Info</summary>
+              <div className="mt-2 space-y-1 font-mono">
+                <p>Creator Name: "{creatorName}" ({creatorName.length} chars)</p>
+                <p>Network: {chainId}</p>
+                <p>Address: {address}</p>
+                <p>Fee: {fee} ETH ({fee ? parseEther(fee).toString() : '0'} wei)</p>
+                <p>Platform Share: {platformShare}%</p>
+                <p>Already Registered: {isAlreadyRegistered ? "Yes" : "No"}</p>
+                <p>Contract: {contractExists === null ? "Checking..." : contractExists ? "Found" : "Not Found"}</p>
+                <p>Simulation: {simulateError ? "Failed" : simulateData ? "Success" : "Pending"}</p>
+                {address && <p>Has Stored Name: {hasCreatorName(address) ? "Yes" : "No"}</p>}
+              </div>
+            </details> */}
           </CardContent>
           <CardFooter>
             <Button 
               type="submit" 
-              className="w-full bg-black text-white" 
-              disabled={isSubmitting || txLoading || contractExists === false}
+              className="w-full bg-black text-white text-base py-6" 
+              disabled={
+                isSubmitting || 
+                txLoading || 
+                contractExists === false || 
+                isAlreadyRegistered ||
+                !!simulateError ||
+                !creatorName.trim() ||
+                creatorName.trim().length < 2
+              }
             >
-              {isSubmitting || txLoading ? "Processing..." : "Register as Creator"}
+              {isSubmitting || txLoading ? (
+                <>Processing Registration...</>
+              ) : isAlreadyRegistered ? (
+                "Already Registered"
+              ) : simulateError ? (
+                "Transaction Would Fail"
+              ) : !creatorName.trim() ? (
+                "Enter Creator Name"
+              ) : (
+                `Register as "${creatorName.trim()}"`
+              )}
             </Button>
           </CardFooter>
         </form>
