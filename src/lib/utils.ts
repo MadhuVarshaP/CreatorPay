@@ -11,7 +11,8 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+import { formatUnits } from "viem"
 
-export function formatEth(value: number): string {
-  return value.toFixed(4)
+export function formatEth(value: bigint, decimals = 18): string {
+  return formatUnits(value, decimals)
 }

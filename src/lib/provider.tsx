@@ -12,6 +12,7 @@ import {
   optimism,
   arbitrum,
   base,
+  polygonAmoy
 } from 'wagmi/chains';
 import {
   QueryClientProvider,
@@ -22,7 +23,7 @@ import { ReactNode } from 'react';
 const config = getDefaultConfig({
   appName: 'My RainbowKit App',
   projectId: '8e000855fac35d6427f4c731b6089f97D', 
-  chains: [mainnet, polygon, optimism, arbitrum, base],
+  chains: [mainnet, polygon, optimism, arbitrum, base, polygonAmoy],
   ssr: true, 
 });
 
