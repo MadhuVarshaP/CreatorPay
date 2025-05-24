@@ -1,3 +1,4 @@
+import { decodeEventLog } from "viem";
 
 // Contract address on the blockchain
 export const CONTRACT_ADDRESS = '0xe893b73f1339C4F40747F660FC1188aA26976e5c';
@@ -17,6 +18,12 @@ export const CONTRACT_ABI = [
 				"internalType": "address",
 				"name": "creator",
 				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
 			},
 			{
 				"indexed": false,
@@ -55,6 +62,11 @@ export const CONTRACT_ABI = [
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
 			{
 				"internalType": "uint256",
 				"name": "fee",
@@ -153,6 +165,11 @@ export const CONTRACT_ABI = [
 		"name": "creators",
 		"outputs": [
 			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
 				"internalType": "uint256",
 				"name": "subscriptionFee",
 				"type": "uint256"
@@ -171,6 +188,57 @@ export const CONTRACT_ABI = [
 				"internalType": "uint256",
 				"name": "platformBalance",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "creator",
+				"type": "address"
+			}
+		],
+		"name": "getCreatorName",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getRegisteredCreators",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "",
+				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "creator",
+				"type": "address"
+			}
+		],
+		"name": "getSubscribers",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "",
+				"type": "address[]"
 			}
 		],
 		"stateMutability": "view",
@@ -203,6 +271,25 @@ export const CONTRACT_ABI = [
 	{
 		"inputs": [],
 		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "registeredCreators",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -264,3 +351,4 @@ export const CONTRACT_ABI = [
 		"type": "function"
 	}
 ]
+

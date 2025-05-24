@@ -16,7 +16,6 @@ import { useWriteContract, useWaitForTransactionReceipt, useSimulateContract } f
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Info, User } from "lucide-react"
-import { storeCreatorName } from "@/lib/creatorStorage"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -40,9 +39,9 @@ export default function RegisterPage() {
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: "registerCreator",
-    args: fee ? [parseEther(fee), BigInt(platformShare)] : undefined,
+    args: fee && creatorName.trim() ? [creatorName.trim(), parseEther(fee), BigInt(platformShare)] : undefined,
     query: {
-      enabled: isConnected && !!fee && contractExists === true && !isAlreadyRegistered,
+      enabled: isConnected && !!fee && !!creatorName.trim() && contractExists === true && !isAlreadyRegistered,
     },
   })
 
@@ -65,26 +64,10 @@ export default function RegisterPage() {
 
     const trimmedName = creatorName.trim()
     
-    if (trimmedName) {
-      // Store the creator name immediately
-      storeCreatorName(address, trimmedName)
-      
-      console.log(`✅ Registration successful! Stored name "${trimmedName}" for ${address}`)
-      
-      toast.success("Registration Successful!", {
-        description: `Welcome ${trimmedName}! Your creator profile has been set up.`,
-        duration: 4000,
-      })
-
-      // Try to set name on-chain if the contract supports it
-      try {
-        await setCreatorNameOnChain(trimmedName)
-      } catch (err) {
-        console.log("On-chain name setting failed, but local storage succeeded")
-      }
-    } else {
-      toast.success("Successfully registered as creator!")
-    }
+    toast.success("Registration Successful!", {
+      description: `Welcome ${trimmedName}! Your creator profile has been set up.`,
+      duration: 4000,
+    })
     
     // Redirect after a short delay
     setTimeout(() => {
@@ -103,14 +86,15 @@ export default function RegisterPage() {
           abi: CONTRACT_ABI,
           functionName: "creators",
           args: [address],
-        }) as [bigint, bigint, bigint, bigint]
+        }) as [string, bigint, bigint, bigint, bigint]
         
-        const isRegistered = creatorData[0] > 0n
+        // Check if creator has a name (first field of the struct)
+        const isRegistered = creatorData[0] && creatorData[0].length > 0
         setIsAlreadyRegistered(isRegistered)
         
         if (isRegistered) {
           toast.warning("Already registered", {
-            description: "You are already registered as a creator",
+            description: `You are already registered as creator "${creatorData[0]}"`,
             duration: 5000,
           })
         }
@@ -185,14 +169,14 @@ export default function RegisterPage() {
   // Gas estimation
   useEffect(() => {
     const estimateGas = async () => {
-      if (!isConnected || !publicClient || !fee || contractExists !== true || isAlreadyRegistered) return
+      if (!isConnected || !publicClient || !fee || !creatorName.trim() || contractExists !== true || isAlreadyRegistered) return
       
       try {
         const gas = await publicClient.estimateContractGas({
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: "registerCreator",
-          args: [parseEther(fee), BigInt(platformShare)],
+          args: [creatorName.trim(), parseEther(fee), BigInt(platformShare)],
           account: address,
         })
         
@@ -203,31 +187,7 @@ export default function RegisterPage() {
     }
     
     estimateGas()
-  }, [isConnected, publicClient, fee, platformShare, contractExists, address, isAlreadyRegistered])
-
-  const setCreatorNameOnChain = async (name: string) => {
-    try {
-      const hasSetNameFunction = CONTRACT_ABI.some(
-        (item: any) => item.name === "setCreatorName" && item.type === "function"
-      )
-
-      if (hasSetNameFunction) {
-        console.log("Setting creator name on-chain...")
-        
-        await writeContractAsync({
-          abi: CONTRACT_ABI,
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          functionName: "setCreatorName",
-          args: [name],
-        })
-        
-        console.log("✅ Creator name set on-chain successfully!")
-      }
-    } catch (err: any) {
-      console.error("Error setting creator name on-chain:", err)
-      // Don't throw error - local storage is more important
-    }
-  }
+  }, [isConnected, publicClient, fee, platformShare, creatorName, contractExists, address, isAlreadyRegistered])
 
   useEffect(() => {
     if (!isConnected) {
@@ -308,7 +268,7 @@ export default function RegisterPage() {
           abi: CONTRACT_ABI,
           address: CONTRACT_ADDRESS as `0x${string}`,
           functionName: "registerCreator",
-          args: [feeInWei, BigInt(platformShare)],
+          args: [trimmedName, feeInWei, BigInt(platformShare)],
           ...(gasEstimate && { gas: gasEstimate + (gasEstimate / 10n) })
         }
       )
@@ -486,27 +446,11 @@ export default function RegisterPage() {
                 Platform fee percentage (you keep {100 - platformShare}%)
               </p>
             </div>
-            
-            {/* Debug info - can be removed in production */}
-            {/* <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer hover:text-foreground">Debug Info</summary>
-              <div className="mt-2 space-y-1 font-mono">
-                <p>Creator Name: "{creatorName}" ({creatorName.length} chars)</p>
-                <p>Network: {chainId}</p>
-                <p>Address: {address}</p>
-                <p>Fee: {fee} ETH ({fee ? parseEther(fee).toString() : '0'} wei)</p>
-                <p>Platform Share: {platformShare}%</p>
-                <p>Already Registered: {isAlreadyRegistered ? "Yes" : "No"}</p>
-                <p>Contract: {contractExists === null ? "Checking..." : contractExists ? "Found" : "Not Found"}</p>
-                <p>Simulation: {simulateError ? "Failed" : simulateData ? "Success" : "Pending"}</p>
-                {address && <p>Has Stored Name: {hasCreatorName(address) ? "Yes" : "No"}</p>}
-              </div>
-            </details> */}
           </CardContent>
           <CardFooter>
             <Button 
               type="submit" 
-              className="w-full bg-black text-white text-base py-6" 
+              className="w-full bg-black text-white text-base my-3" 
               disabled={
                 isSubmitting || 
                 txLoading || 
