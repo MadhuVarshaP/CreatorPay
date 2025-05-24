@@ -12,8 +12,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-import { formatUnits } from "viem"
-export function formatEth(value?: bigint, decimals = 18): string {
-  if (value === undefined || value === null) return "0.0"
-  return formatUnits(value, decimals)
+
+export const formatEth = (value: number | bigint): string => {
+  const eth = typeof value === 'bigint' ? Number(value) / 1e18 : value / 1e18
+  return eth.toFixed(6)
 }

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react"
 import {
+  useAccount,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -18,14 +19,12 @@ interface CreatorCardProps {
   creator: Pick<Creator, "address" | "name">
 }
 
-// Return type of the Creator struct from contract
-// struct Creator { string name, uint256 subscriptionFee, uint256 platformShare, uint256 creatorBalance, uint256 platformBalance }
 type CreatorStruct = readonly [string, bigint, bigint, bigint, bigint]
 
 export default function CreatorCard({ creator }: CreatorCardProps) {
   const [isSubscribing, setIsSubscribing] = useState(false)
+  const { address: userAddress } = useAccount()
 
-  // Fetch on-chain creator details
   const { 
     data: onchainData, 
     isLoading, 
@@ -38,38 +37,36 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     args: [creator.address],
   })
 
-  // Prepare write hook for subscription
+  const {
+    data: isSubscribed,
+    refetch: refetchSubscription,
+    isLoading: isCheckingSub,
+  } = useReadContract({
+    abi: CONTRACT_ABI,
+    address: CONTRACT_ADDRESS,
+    functionName: "isSubscribed",
+    args: [userAddress, creator.address],
+  })
+
   const { writeContractAsync, data: hash, error: writeError } = useWriteContract()
 
-  // Wait for transaction
   const { isLoading: txLoading, isSuccess } = useWaitForTransactionReceipt({ 
     hash,
     onSuccess: () => {
-      // Refetch creator data after successful subscription
       refetch()
+      refetchSubscription()
     }
   })
 
-  // Extract values from onchainData
   const creatorName = onchainData?.[0] || ""
   const subscriptionFee = onchainData?.[1]
   const platformShare = onchainData?.[2] ? Number(onchainData[2]) : undefined
   const creatorBalance = onchainData?.[3]
   const platformBalance = onchainData?.[4]
 
-  // Determine display name with proper fallbacks
   const getDisplayName = () => {
-    // First priority: On-chain name from contract
-    if (creatorName && creatorName.trim().length > 0) {
-      return creatorName.trim()
-    }
-    
-    // Second priority: Name passed via props (fallback)
-    if (creator.name && creator.name.trim().length > 0) {
-      return creator.name.trim()
-    }
-    
-    // Final fallback: Truncated address
+    if (creatorName && creatorName.trim().length > 0) return creatorName.trim()
+    if (creator.name && creator.name.trim().length > 0) return creator.name.trim()
     return `${creator.address.slice(0, 6)}...${creator.address.slice(-4)}`
   }
 
@@ -93,25 +90,17 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         value: subscriptionFee,
         gasLimit: 100000,
       })
-      
-      // Success is handled by the transaction receipt hook
     } catch (err: any) {
       console.error("Subscription failed:", err)
-      
       let errorMessage = "Subscription failed"
-      if (err.shortMessage) {
-        errorMessage += `: ${err.shortMessage}`
-      } else if (err.message) {
-        errorMessage += `: ${err.message}`
-      }
-      
+      if (err.shortMessage) errorMessage += `: ${err.shortMessage}`
+      else if (err.message) errorMessage += `: ${err.message}`
       alert(errorMessage)
     } finally {
       setIsSubscribing(false)
     }
   }
 
-  // Show loading state
   if (isLoading) {
     return (
       <Card className="overflow-hidden">
@@ -133,15 +122,12 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           </div>
         </CardContent>
         <CardFooter>
-          <Button className="w-full" disabled>
-            Loading...
-          </Button>
+          <Button className="w-full" disabled>Loading...</Button>
         </CardFooter>
       </Card>
     )
   }
 
-  // Show error state
   if (readError || !isRegistered) {
     return (
       <Card className="overflow-hidden border-red-200">
@@ -178,36 +164,6 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     )
   }
 
-  // Show success state after subscription
-  if (isSuccess) {
-    return (
-      <Card className="overflow-hidden border-green-200">
-        <CardHeader className="bg-green-50">
-          <CardTitle className="flex items-center justify-between text-green-700">
-            <span className="text-lg font-semibold">{displayName}</span>
-            <Badge className="bg-green-100 text-green-800">Subscribed!</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="text-center py-4">
-            <p className="text-green-600 font-medium">
-              Successfully subscribed to {displayName}!
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Your subscription is now active.
-            </p>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button className="w-full" variant="outline" disabled>
-            Subscribed ✓
-          </Button>
-        </CardFooter>
-      </Card>
-    )
-  }
-
-  // Show normal creator card
   return (
     <Card className="overflow-hidden">
       <CardHeader className="bg-muted/50">
@@ -216,14 +172,17 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
             {displayName}
           </span>
           <div className="flex gap-2">
+            {isSubscribed && (
+              <Badge className="bg-green-100 text-green-800">
+                Subscribed
+              </Badge>
+            )}
             {hasValidName && (
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Verified
               </Badge>
             )}
-            <Badge variant="outline">
-              Creator
-            </Badge>
+            <Badge variant="outline">Creator</Badge>
           </div>
         </CardTitle>
       </CardHeader>
@@ -235,17 +194,12 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
               {subscriptionFee !== undefined ? `${formatEth(subscriptionFee)} ETH` : "Loading..."}
             </p>
           </div>
-
           <div>
             <p className="text-md font-medium text-muted-foreground">Platform Share</p>
             <p className="text-lg font-bold">
               {platformShare !== undefined ? `${platformShare}%` : "Loading..."}
-              {/* <span className="text-sm text-muted-foreground ml-2">
-                (You get {platformShare !== undefined ? 100 - platformShare : "..."}%)
-              </span> */}
             </p>
           </div>
-
           {creatorBalance !== undefined && creatorBalance > 0n && (
             <div>
               <p className="text-sm font-medium text-muted-foreground">Creator Earnings</p>
@@ -263,11 +217,14 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           disabled={
             isSubscribing || 
             txLoading || 
+            isSubscribed || 
             subscriptionFee === undefined || 
             subscriptionFee <= 0n
           }
         >
-          {isSubscribing || txLoading ? (
+          {isSubscribed ? (
+            "Already Subscribed ✓"
+          ) : isSubscribing || txLoading ? (
             "Processing..."
           ) : subscriptionFee === undefined ? (
             "Loading..."
@@ -276,7 +233,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           )}
         </Button>
       </CardFooter>
-      
+
       {writeError && (
         <CardFooter className="pt-2">
           <div className="w-full p-3 bg-red-50 border border-red-200 rounded-lg">

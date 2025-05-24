@@ -1,25 +1,40 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { creators } from "@/lib/mock-data"
-import { formatEth } from "@/lib/utils"
-import { useAccount } from "wagmi"
-import { toast, Toaster } from "sonner"
+import { useEffect, useState } from "react"
+import { useAccount, usePublicClient, useWalletClient } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
+import { Toaster, toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { formatEth } from "@/lib/utils"
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract"
+import { parseEther } from "viem"
 
 export default function UserDashboard() {
-  const { isConnected } = useAccount()
-  const [subscriptions, setSubscriptions] = useState<Record<string, boolean>>({
-    "0x1234567890123456789012345678901234567890": true,
-    "0x2345678901234567890123456789012345678901": true,
-  })
+  const { isConnected, address } = useAccount()
+  const publicClient = usePublicClient()
+  const { data: walletClient } = useWalletClient()
+
+  const [registeredCreators, setRegisteredCreators] = useState<string[]>([])
+  const [creatorData, setCreatorData] = useState<
+    {
+      address: string
+      name: string
+      fee: bigint
+      platformShare: bigint
+      expiry: number
+    }[]
+  >([])
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if wallet is connected when component mounts
     if (!isConnected) {
       toast.warning("Wallet required", {
         description: "Please connect your wallet to access the user dashboard",
@@ -28,48 +43,87 @@ export default function UserDashboard() {
     }
   }, [isConnected])
 
-  const handleSubscribe = async (creatorAddress: string, isSubscribed: boolean) => {
-    if (!isConnected) {
-      toast.error("Wallet not connected", {
-        description: "Please connect your wallet to manage subscriptions",
-        duration: 5000,
+  const fetchCreatorDetails = async () => {
+    if (!isConnected || !address || !publicClient) return
+
+    try {
+      const addresses = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getRegisteredCreators",
       })
 
+      setRegisteredCreators(addresses as string[])
+
+      const details = await Promise.all(
+        (addresses as string[]).map(async (creatorAddress) => {
+          const [creatorStruct, expiry] = await Promise.all([
+            publicClient.readContract({
+              address: CONTRACT_ADDRESS,
+              abi: CONTRACT_ABI,
+              functionName: "creators",
+              args: [creatorAddress],
+            }),
+            publicClient.readContract({
+              address: CONTRACT_ADDRESS,
+              abi: CONTRACT_ABI,
+              functionName: "subscriptions",
+              args: [address, creatorAddress],
+            }),
+          ])
+
+          return {
+            address: creatorAddress,
+            name: creatorStruct[0] as string,
+            fee: creatorStruct[1] as bigint,
+            platformShare: creatorStruct[2] as bigint,
+            expiry: Number(expiry),
+          }
+        })
+      )
+
+      setCreatorData(details)
+    } catch (err) {
+      console.error("Error fetching creator details:", err)
+      toast.error("Failed to fetch creator data")
+    }
+  }
+
+  useEffect(() => {
+    fetchCreatorDetails()
+  }, [isConnected, address])
+
+  const handleSubscribe = async (creatorAddress: string, isSubscribed: boolean, fee: bigint) => {
+    if (!isConnected || !walletClient || !address) {
+      toast.error("Wallet not connected", {
+        description: "Please connect your wallet to manage subscriptions",
+      })
       return
     }
 
     setProcessing(creatorAddress)
-    
+
     try {
-      // Show a loading toast
-      const toastId = toast.loading(`${isSubscribed ? "Renewing" : "Processing"} subscription...`, {
-        duration: 10000, // Longer duration for loading state
+      const toastId = toast.loading(`${isSubscribed ? "Renewing" : "Subscribing"}...`)
+
+      const txHash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "subscribe",
+        args: [creatorAddress],
+        value: fee,
+        account: address,
       })
-      
-      // Simulate API call to subscribe
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      
-      // Update subscriptions state
-      setSubscriptions((prev) => ({
-        ...prev,
-        [creatorAddress]: true,
-      }))
-      
-      // Find creator name for the toast message
-      const creator = creators.find(c => c.address === creatorAddress)
-      
-      // Dismiss the loading toast and show success toast
+
+      await publicClient.waitForTransactionReceipt({ hash: txHash })
+
       toast.dismiss(toastId)
-      toast.success(`Successfully ${isSubscribed ? "renewed" : "subscribed"}!`, {
-        description: `You are now subscribed to ${creator?.name || "the creator"}`,
-        duration: 5000,
-      })
-    } catch (error) {
-      console.error("Error subscribing:", error)
-      toast.error("Subscription failed", {
-        description: "There was an error processing your subscription. Please try again.",
-        duration: 5000,
-      })
+      toast.success("Subscription successful!")
+
+      await fetchCreatorDetails()
+    } catch (err) {
+      console.error("Subscription failed:", err)
+      toast.error("Transaction failed")
     } finally {
       setProcessing(null)
     }
@@ -81,11 +135,10 @@ export default function UserDashboard() {
         <Toaster position="bottom-right" closeButton richColors />
         <h1 className="text-3xl font-bold mb-6">User Dashboard</h1>
         <Card>
-           <CardContent className="py-10 flex flex-col items-center justify-center">
-                      <p className="mb-6">Please connect your wallet to access the creator dashboard</p>
-                      {/* <Button onClick={() => openConnectModal?.()}>Connect Wallet</Button> */}
-                      <ConnectButton />
-                    </CardContent>     
+          <CardContent className="py-10 flex flex-col items-center justify-center">
+            <p className="mb-6">Please connect your wallet to access the creator dashboard</p>
+            <ConnectButton />
+          </CardContent>
         </Card>
       </div>
     )
@@ -103,37 +156,41 @@ export default function UserDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {creators.map((creator) => {
-              const isSubscribed = subscriptions[creator.address] || false
+            {creatorData.map((creator) => {
+              const isSubscribed = creator.expiry > Date.now() / 1000
               const isProcessing = processing === creator.address
+              const daysLeft = Math.max(
+                0,
+                Math.floor((creator.expiry - Date.now() / 1000) / 86400)
+              )
 
               return (
-                <div key={creator.address} className="flex justify-between items-center p-4 border rounded-lg">
+                <div
+                  key={creator.address}
+                  className="flex justify-between items-center p-4 border rounded-lg"
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{creator.name}</p>
-                      {isSubscribed && (
+                      {isSubscribed ? (
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                           Subscribed ✅
                         </Badge>
-                      )}
-                      {!isSubscribed && (
+                      ) : (
                         <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
                           Not Subscribed ❌
                         </Badge>
                       )}
                     </div>
                     <p className="font-mono text-xs text-muted-foreground">{creator.address}</p>
-                    <p className="text-sm mt-1">{formatEth(creator.subscriptionFee)} ETH per month</p>
+                    <p className="text-sm mt-1">{formatEth(creator.fee)} ETH / month</p>
                     {isSubscribed && (
-                      <p className="text-sm text-muted-foreground">
-                        Expires in {Math.floor(Math.random() * 30) + 1} days
-                      </p>
+                      <p className="text-sm text-muted-foreground">Renews in {daysLeft} days</p>
                     )}
                   </div>
                   <Button
                     variant={isSubscribed ? "outline" : "default"}
-                    onClick={() => handleSubscribe(creator.address, isSubscribed)}
+                    onClick={() => handleSubscribe(creator.address, isSubscribed, creator.fee)}
                     disabled={isProcessing}
                     className="bg-black text-white"
                   >
