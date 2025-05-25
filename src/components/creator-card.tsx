@@ -31,7 +31,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     error: readError,
     refetch 
   } = useReadContract<typeof CONTRACT_ABI, "creators", CreatorStruct>({
-    abi: CONTRACT_ABI,
+    abi: CONTRACT_ABI, 
     address: CONTRACT_ADDRESS,
     functionName: "creators",
     args: [creator.address],
@@ -45,12 +45,22 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     abi: CONTRACT_ABI,
     address: CONTRACT_ADDRESS,
     functionName: "isSubscribed",
-    args: [userAddress, creator.address],
+    args: userAddress ? [userAddress, creator.address] : undefined,
+    query: {
+      enabled: !!userAddress,
+    },
   })
 
-  const { writeContractAsync, data: hash, error: writeError } = useWriteContract()
+  const {
+    writeContractAsync,
+    data: hash,
+    error: writeError,
+  } = useWriteContract()
 
-  const { isLoading: txLoading, isSuccess } = useWaitForTransactionReceipt({ 
+  const {
+    isLoading: txLoading,
+    isSuccess,
+  } = useWaitForTransactionReceipt({ 
     hash,
     onSuccess: () => {
       refetch()
@@ -62,6 +72,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
   const subscriptionFee = onchainData?.[1]
   const platformShare = onchainData?.[2] ? Number(onchainData[2]) : undefined
   const creatorBalance = onchainData?.[3]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const platformBalance = onchainData?.[4]
 
   const getDisplayName = () => {
@@ -90,11 +101,12 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         value: subscriptionFee,
         gasLimit: 100000,
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Subscription failed:", err)
       let errorMessage = "Subscription failed"
-      if (err.shortMessage) errorMessage += `: ${err.shortMessage}`
-      else if (err.message) errorMessage += `: ${err.message}`
+      if (err && typeof err === "object" && "message" in err) {
+        errorMessage += `: ${(err as any).message}`
+      }
       alert(errorMessage)
     } finally {
       setIsSubscribing(false)
@@ -109,16 +121,14 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
             <span className="text-lg font-semibold">Loading...</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Subscription Fee</p>
-              <p className="text-xl font-bold">Loading...</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Platform Share</p>
-              <p>Loading...</p>
-            </div>
+        <CardContent className="pt-6 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Subscription Fee</p>
+            <p className="text-xl font-bold">Loading...</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Platform Share</p>
+            <p>Loading...</p>
           </div>
         </CardContent>
         <CardFooter>
@@ -140,15 +150,13 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
             <Badge variant="destructive">Error</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="text-center py-4">
-            <p className="text-red-600 font-medium">
-              {readError ? "Failed to load creator data" : "Creator not registered"}
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              {readError ? readError.message : "This creator hasn't registered on the platform yet."}
-            </p>
-          </div>
+        <CardContent className="pt-6 text-center py-4">
+          <p className="text-red-600 font-medium">
+            {readError ? "Failed to load creator data" : "Creator not registered"}
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {readError ? (readError as Error).message : "This creator hasn't registered on the platform yet."}
+          </p>
         </CardContent>
         <CardFooter>
           <Button 
@@ -167,7 +175,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="bg-muted/50">
-        <CardTitle className="flex items-center justify-between ">
+        <CardTitle className="flex items-center justify-between">
           <span className="text-2xl font-bold flex items-center gap-2">
             {displayName}
           </span>
@@ -186,29 +194,27 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        <div className="space-y-4">
-          <div>
-            <p className="text-md font-medium text-muted-foreground">Subscription Fee</p>
-            <p className="text-xl font-bold">
-              {subscriptionFee !== undefined ? `${formatEth(subscriptionFee)} ETH` : "Loading..."}
-            </p>
-          </div>
-          <div>
-            <p className="text-md font-medium text-muted-foreground">Platform Share</p>
-            <p className="text-lg font-bold">
-              {platformShare !== undefined ? `${platformShare}%` : "Loading..."}
-            </p>
-          </div>
-          {creatorBalance !== undefined && creatorBalance > 0n && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Creator Earnings</p>
-              <p className="text-lg font-semibold text-green-600">
-                {formatEth(creatorBalance)} ETH
-              </p>
-            </div>
-          )}
+      <CardContent className="pt-6 space-y-4">
+        <div>
+          <p className="text-md font-medium text-muted-foreground">Subscription Fee</p>
+          <p className="text-xl font-bold">
+            {subscriptionFee !== undefined ? `${formatEth(subscriptionFee)} ETH` : "Loading..."}
+          </p>
         </div>
+        <div>
+          <p className="text-md font-medium text-muted-foreground">Platform Share</p>
+          <p className="text-lg font-bold">
+            {platformShare !== undefined ? `${platformShare}%` : "Loading..."}
+          </p>
+        </div>
+        {creatorBalance !== undefined && creatorBalance > 0n && (
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Creator Earnings</p>
+            <p className="text-lg font-semibold text-green-600">
+              {formatEth(creatorBalance)} ETH
+            </p>
+          </div>
+        )}
       </CardContent>
       <CardFooter>
         <Button

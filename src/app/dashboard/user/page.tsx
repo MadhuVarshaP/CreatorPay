@@ -15,7 +15,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { formatEth } from "@/lib/utils"
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract"
-import { parseEther } from "viem"
 
 export default function UserDashboard() {
   const { isConnected, address } = useAccount()

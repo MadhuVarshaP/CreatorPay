@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
-import { formatEther, parseEther } from 'viem'
+import { formatEther } from 'viem'
 import {
   Card,
   CardHeader,
@@ -173,6 +173,7 @@ export default function AdminDashboard() {
       setTotalPlatformFees(BigInt(0))
       // You might want to refresh all data here
       
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Withdrawal error:', err)
       toast.error('Withdrawal failed', {

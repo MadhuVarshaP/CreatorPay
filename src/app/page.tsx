@@ -111,10 +111,12 @@ export default function HomePage() {
           setCreators(deduplicateCreators(valid))
           setUsingFallbackCreators(false)
         } else {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
           useFallbackCreators()
         }
       } catch (err) {
         console.error("Error loading creators:", err)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
         useFallbackCreators()
       }
     }

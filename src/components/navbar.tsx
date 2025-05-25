@@ -16,7 +16,7 @@ export default function Navbar() {
     <header className="border-b">
       <div className="container mx-auto px-4 flex h-16 items-center justify-between">
         <Link href="/" className="font-bold text-xl">
-          CreatorSub
+          CreatorPay
         </Link>
 
         <nav className="flex items-center gap-6">
@@ -67,9 +67,6 @@ export default function Navbar() {
           </Link>
         </nav>
 
-        {/* <Button variant="outline" size="sm">
-          Connect Wallet
-        </Button> */}
         <ConnectButton />
        
       </div>

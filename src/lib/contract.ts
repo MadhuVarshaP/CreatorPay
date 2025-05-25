@@ -1,9 +1,5 @@
-import { decodeEventLog } from "viem";
-
-// Contract address on the blockchain
 export const CONTRACT_ADDRESS = '0xe893b73f1339C4F40747F660FC1188aA26976e5c';
 
-// Contract ABI (Application Binary Interface)
 export const CONTRACT_ABI = [
 	{
 		"inputs": [],
