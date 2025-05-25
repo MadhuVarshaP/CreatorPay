@@ -15,6 +15,14 @@ interface Creator {
   name: string
 }
 
+// Type for the decoded event args
+interface CreatorRegisteredArgs {
+  creator: string
+  name: string
+  fee: bigint
+  platformShare: bigint
+}
+
 function deduplicateCreators(creators: Creator[]): Creator[] {
   const seen = new Set<string>()
   return creators.filter(c => {
@@ -98,7 +106,14 @@ export default function HomePage() {
               topics: event.topics,
             })
 
-            const name = decoded.args.name || `Creator ${creatorAddress.slice(2, 6)}`
+            // Type guard to ensure args exists and has the expected structure
+            if (!decoded.args || !Array.isArray(decoded.args)) {
+              return null
+            }
+
+            // Cast to the expected type after verification
+            const args = decoded.args as unknown as CreatorRegisteredArgs
+            const name = args.name || `Creator ${creatorAddress.slice(2, 6)}`
             return { address: creatorAddress, name }
           } catch {
             return null
@@ -193,7 +208,14 @@ export default function HomePage() {
             topics: events[events.length - 1].topics,
           })
 
-          const name = decoded.args.name || `Creator ${userAddress.slice(2, 6)}`
+          // Type guard to ensure args exists and has the expected structure
+          if (!decoded.args || !Array.isArray(decoded.args)) {
+            return
+          }
+
+          // Cast to the expected type after verification
+          const args = decoded.args as unknown as CreatorRegisteredArgs
+          const name = args.name || `Creator ${userAddress.slice(2, 6)}`
           setCreators(prev => deduplicateCreators([...prev, { address: userAddress, name }]))
         }
       } catch (err) {
@@ -258,7 +280,7 @@ export default function HomePage() {
             <AlertDescription>
               Be the first to register as a creator on our platform!
             </AlertDescription>
-          </Alert>
+            </Alert>
         </div>
       )}
     </section>

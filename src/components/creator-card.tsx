@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   useAccount,
   useReadContract,
@@ -20,6 +20,8 @@ interface CreatorCardProps {
 }
 
 type CreatorStruct = readonly [string, bigint, bigint, bigint, bigint]
+
+const FALLBACK_DATA: CreatorStruct = ['', 0n, 0n, 0n, 0n]
 
 export default function CreatorCard({ creator }: CreatorCardProps) {
   const [isSubscribing, setIsSubscribing] = useState(false)
@@ -54,6 +56,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     writeContractAsync,
     data: hash,
     error: writeError,
+    isError: isWriteError,
   } = useWriteContract()
 
   const {
@@ -61,17 +64,24 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     isSuccess,
   } = useWaitForTransactionReceipt({ 
     hash,
-    onSuccess: () => {
-      refetch()
-      refetchSubscription()
-    }
   })
 
-  const creatorName = onchainData?.[0] || ""
-  const subscriptionFee = onchainData?.[1]
-  const platformShare = onchainData?.[2] ? Number(onchainData[2]) : undefined
-  const creatorBalance = onchainData?.[3]
-  // const platformBalance = onchainData?.[4] 
+  useEffect(() => {
+    if (isSuccess) {
+      void refetch()
+      void refetchSubscription()
+    }
+  }, [isSuccess, refetch, refetchSubscription])
+
+  // Safe data extraction with proper types
+  const {
+    0: creatorName = '',
+    1: subscriptionFee = 0n,
+    2: platformShareRaw = 0n,
+    3: creatorBalance = 0n
+  } = onchainData || FALLBACK_DATA
+
+  const platformShare = platformShareRaw ? Number(platformShareRaw) : undefined
 
   const getDisplayName = () => {
     if (creatorName && creatorName.trim().length > 0) return creatorName.trim()
@@ -84,7 +94,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
   const isRegistered = subscriptionFee !== undefined && subscriptionFee > 0n
 
   const handleSubscribe = async () => {
-    if (!subscriptionFee) {
+    if (!subscriptionFee || !creator.address) {
       alert("Unable to get subscription fee. Please try again.")
       return
     }
@@ -97,7 +107,6 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         functionName: "subscribe",
         args: [creator.address],
         value: subscriptionFee,
-        gasLimit: 100000,
       })
     } catch (err) {
       console.error("Subscription failed:", err)
@@ -160,7 +169,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           <Button 
             className="w-full" 
             variant="outline"
-            onClick={() => refetch()}
+            onClick={() => void refetch()}
             disabled={isLoading}
           >
             Retry
@@ -221,12 +230,15 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           disabled={
             isSubscribing || 
             txLoading || 
-            isSubscribed || 
+            Boolean(isSubscribed) || 
             subscriptionFee === undefined || 
-            subscriptionFee <= 0n
+            subscriptionFee <= 0n ||
+            !userAddress
           }
         >
-          {isSubscribed ? (
+          {!userAddress ? (
+            "Connect Wallet"
+          ) : isSubscribed ? (
             "Already Subscribed ✓"
           ) : isSubscribing || txLoading ? (
             "Processing..."
@@ -248,7 +260,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         </CardFooter>
       )}
 
-      {writeError && (
+      {isWriteError && writeError && (
         <CardFooter className="pt-2">
           <div className="w-full p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600">

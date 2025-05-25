@@ -16,6 +16,20 @@ import { Badge } from "@/components/ui/badge"
 import { formatEth } from "@/lib/utils"
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract"
 
+interface CreatorData {
+  address: string
+  name: string
+  fee: bigint
+  platformShare: bigint
+  expiry: number
+}
+
+interface CreatorStruct {
+  0: string
+  1: bigint
+  2: bigint
+}
+
 export default function UserDashboard() {
   const { isConnected, address } = useAccount()
   const publicClient = usePublicClient()
@@ -23,15 +37,7 @@ export default function UserDashboard() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [registeredCreators, setRegisteredCreators] = useState<string[]>([])
-  const [creatorData, setCreatorData] = useState<
-    {
-      address: string
-      name: string
-      fee: bigint
-      platformShare: bigint
-      expiry: number
-    }[]
-  >([])
+  const [creatorData, setCreatorData] = useState<CreatorData[]>([])
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,20 +69,20 @@ export default function UserDashboard() {
               abi: CONTRACT_ABI,
               functionName: "creators",
               args: [creatorAddress],
-            }),
+            }) as Promise<CreatorStruct>,
             publicClient.readContract({
               address: CONTRACT_ADDRESS,
               abi: CONTRACT_ABI,
               functionName: "subscriptions",
               args: [address, creatorAddress],
-            }),
+            }) as Promise<bigint>,
           ])
 
           return {
             address: creatorAddress,
-            name: creatorStruct[0] as string,
-            fee: creatorStruct[1] as bigint,
-            platformShare: creatorStruct[2] as bigint,
+            name: creatorStruct[0],
+            fee: creatorStruct[1],
+            platformShare: creatorStruct[2],
             expiry: Number(expiry),
           }
         })
@@ -91,10 +97,11 @@ export default function UserDashboard() {
 
   useEffect(() => {
     fetchCreatorDetails()
-  }, [isConnected, address])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address, publicClient])
 
   const handleSubscribe = async (creatorAddress: string, isSubscribed: boolean, fee: bigint) => {
-    if (!isConnected || !walletClient || !address) {
+    if (!isConnected || !walletClient || !address || !publicClient) {
       toast.error("Wallet not connected", {
         description: "Please connect your wallet to manage subscriptions",
       })

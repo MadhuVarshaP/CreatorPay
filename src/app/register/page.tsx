@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -29,8 +29,6 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [contractExists, setContractExists] = useState<boolean | null>(null)
   const [contractError, setContractError] = useState<string | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null)
   const [detailedError, setDetailedError] = useState<string | null>(null)
   const [gasEstimate, setGasEstimate] = useState<bigint | null>(null)
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState<boolean>(false)
@@ -46,16 +44,8 @@ export default function RegisterPage() {
   })
 
   const { writeContractAsync, data: hash, error: writeError } = useWriteContract()
-  const { isLoading: txLoading, isSuccess } = useWaitForTransactionReceipt({ 
+  const { isLoading: txLoading, isSuccess, error: txError } = useWaitForTransactionReceipt({ 
     hash,
-    onSuccess: () => {
-      handleRegistrationSuccess()
-    },
-    onError: (error: Error) => {
-      toast.error("Transaction failed", {
-        description: error?.message || "There was an error processing your transaction",
-      })
-    }
   })
 
   const handleRegistrationSuccess = async () => {
@@ -73,6 +63,22 @@ export default function RegisterPage() {
     }, 2000)
   }
 
+  // Handle transaction success
+  useEffect(() => {
+    if (isSuccess && hash) {
+      handleRegistrationSuccess()
+    }
+  }, [isSuccess, hash, address])
+
+  // Handle transaction error
+  useEffect(() => {
+    if (txError) {
+      toast.error("Transaction failed", {
+        description: txError?.message || "There was an error processing your transaction",
+      })
+    }
+  }, [txError])
+
   useEffect(() => {
     const checkRegistration = async () => {
       if (!isConnected || !publicClient || !address) return
@@ -85,12 +91,12 @@ export default function RegisterPage() {
           args: [address],
         }) as [string, bigint, bigint, bigint, bigint]
 
-        const isRegistered = creatorData[0] && creatorData[0].length > 0
+        const isRegistered = Boolean(creatorData[0] && creatorData[0].length > 0)
         setIsAlreadyRegistered(isRegistered)
 
         if (isRegistered) {
           toast.warning("Already registered", {
-            description: `You are already registered as creator \"${creatorData[0]}\"`,
+            description: `You are already registered as creator "${creatorData[0]}"`,
             duration: 5000,
           })
         }
@@ -139,7 +145,8 @@ export default function RegisterPage() {
             functionName: "totalPlatformFees",
           })
 
-          setDebugInfo({ 
+          // Debug info for development
+          console.log({
             contractOwner: owner,
             subscriptionDuration: Number(subscriptionDuration),
             totalPlatformFees: formatEther(totalPlatformFees as bigint),
@@ -163,7 +170,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const estimateGas = async () => {
-      if (!isConnected || !publicClient || !fee || !creatorName.trim() || contractExists !== true || isAlreadyRegistered) return
+      if (!isConnected || !publicClient || !fee || !creatorName.trim() || contractExists !== true || isAlreadyRegistered || !address) return
 
       try {
         const gas = await publicClient.estimateContractGas({
@@ -171,7 +178,7 @@ export default function RegisterPage() {
           abi: CONTRACT_ABI,
           functionName: "registerCreator",
           args: [creatorName.trim(), parseEther(fee), BigInt(platformShare)],
-          account: address,
+          account: address as `0x${string}`,
         })
 
         setGasEstimate(gas)
@@ -247,15 +254,21 @@ export default function RegisterPage() {
 
       const feeInWei = parseEther(fee)
 
-      const txHash = await writeContractAsync(
-        simulateData?.request || {
+      let txHash: `0x${string}`
+
+      if (simulateData?.request) {
+        // Use the simulated request if available
+        txHash = await writeContractAsync(simulateData.request)
+      } else {
+        // Fallback to manual contract write
+        txHash = await writeContractAsync({
           abi: CONTRACT_ABI,
           address: CONTRACT_ADDRESS as `0x${string}`,
           functionName: "registerCreator",
           args: [trimmedName, feeInWei, BigInt(platformShare)],
           ...(gasEstimate && { gas: gasEstimate + (gasEstimate / 10n) }),
-        }
-      )
+        })
+      }
       
       toast.success("Transaction submitted", {
         description: (
@@ -273,16 +286,19 @@ export default function RegisterPage() {
         ),
         duration: 7000,
       })
-      
 
       toast.dismiss(toastId)
 
     } catch (err) {
-      console.error("❌ Registration failed:", err)
+      console.error("Registration failed:", err)
 
       let errorMsg = "Registration failed. "
 
-      const error = err as Error & { cause?: { reason?: string }, shortMessage?: string }
+      const error = err as Error & { 
+        cause?: { reason?: string }
+        shortMessage?: string
+        message?: string
+      }
 
       if (error.cause?.reason) {
         errorMsg += error.cause.reason
@@ -408,7 +424,7 @@ export default function RegisterPage() {
               {creatorName.trim() && (
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                  Preview: Your profile will show as &quot;<strong>{creatorName.trim()}</strong>&quot;
+                    Preview: Your profile will show as &quot;<strong>{creatorName.trim()}</strong>&quot;
                   </p>
                 </div>
               )}
