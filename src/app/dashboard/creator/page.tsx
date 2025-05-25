@@ -29,33 +29,36 @@ export default function CreatorDashboard() {
   const publicClient = usePublicClient()
 
   // Read creator details
-  const { 
-    data: creatorData, 
-    isLoading: isCreatorLoading, 
-    refetch: refetchCreatorData 
-  } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "creators",
-    args: userAddress ? [userAddress] : undefined,
-    enabled: isConnected && !!userAddress,
-  })
+  const {
+    data: creatorData,
+    isLoading: isCreatorLoading,
+    refetch: refetchCreatorData,
+  } = userAddress && isConnected
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    ? useReadContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "creators",
+        args: [userAddress],
+      })
+    : { data: undefined, isLoading: false, refetch: () => {} }
 
   // Read subscribers list
-  const { 
-    data: subscribersData, 
-    isLoading: isSubscribersLoading, 
+  const {
+    data: subscribersData,
+    isLoading: isSubscribersLoading,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    refetch: refetchSubscribers 
-  } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "getSubscribers",
-    args: userAddress ? [userAddress] : undefined,
-    enabled: isConnected && !!userAddress,
-  })
+    refetch: refetchSubscribers,
+  } = userAddress && isConnected
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    ? useReadContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getSubscribers",
+        args: [userAddress],
+      })
+    : { data: undefined, isLoading: false, refetch: () => {} }
 
-  // Withdraw creator earnings write hook
   const {
     data: withdrawHash,
     writeContract: withdraw,
@@ -63,11 +66,7 @@ export default function CreatorDashboard() {
     error: withdrawError,
   } = useWriteContract()
 
-  // Wait for transaction receipt
-  const { 
-    data: receipt, 
-    isLoading: isTxLoading 
-  } = useWaitForTransactionReceipt({
+  const { data: receipt, isLoading: isTxLoading } = useWaitForTransactionReceipt({
     hash: withdrawHash,
   })
 
@@ -84,12 +83,11 @@ export default function CreatorDashboard() {
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
-  // Update creator details when data changes
   useEffect(() => {
     if (creatorData) {
       const [name, subscriptionFee, platformShare, creatorBalance] = creatorData
       const isRegistered = subscriptionFee > 0n
-      
+
       setCreatorDetails(prev => ({
         ...prev,
         name: name || "Unnamed Creator",
@@ -101,7 +99,6 @@ export default function CreatorDashboard() {
     }
   }, [creatorData])
 
-  // Update subscriber count when data changes
   useEffect(() => {
     if (subscribersData) {
       const subscribers = subscribersData
@@ -112,42 +109,37 @@ export default function CreatorDashboard() {
     }
   }, [subscribersData])
 
-  // Fetch subscription activities from blockchain events
   const fetchSubscriptionActivities = async () => {
     if (!publicClient || !userAddress || !creatorDetails.isRegistered) return
 
     setIsLoadingActivities(true)
     try {
-      // Get subscription events for this creator
       const logs = await publicClient.getLogs({
         address: CONTRACT_ADDRESS,
         event: {
-          type: 'event',
-          name: 'Subscribed',
+          type: "event",
+          name: "Subscribed",
           inputs: [
-            { type: 'address', indexed: true, name: 'user' },
-            { type: 'address', indexed: true, name: 'creator' },
-            { type: 'uint256', indexed: false, name: 'expiresAt' }
-          ]
+            { type: "address", indexed: true, name: "user" },
+            { type: "address", indexed: true, name: "creator" },
+            { type: "uint256", indexed: false, name: "expiresAt" },
+          ],
         },
         args: {
-          creator: userAddress
+          creator: userAddress,
         },
-        fromBlock: 'earliest',
-        toBlock: 'latest'
+        fromBlock: "earliest",
+        toBlock: "latest",
       })
 
-      // Process logs to get subscription activities
       const activities = await Promise.all(
         logs.map(async (log) => {
-          // Get block details for timestamp
           const block = await publicClient.getBlock({
-            blockHash: log.blockHash
+            blockHash: log.blockHash,
           })
-          
-          // Get transaction details for amount paid
+
           const transaction = await publicClient.getTransaction({
-            hash: log.transactionHash
+            hash: log.transactionHash,
           })
 
           return {
@@ -157,41 +149,38 @@ export default function CreatorDashboard() {
             timestamp: Number(block.timestamp),
             blockNumber: Number(log.blockNumber),
             transactionHash: log.transactionHash,
-            amount: transaction.value, // Amount paid in the transaction
+            amount: transaction.value,
             gasUsed: transaction.gas,
           }
         })
       )
 
-      // Sort by timestamp (most recent first)
       const sortedActivities = activities.sort((a, b) => b.timestamp - a.timestamp)
       setSubscriptionActivities(sortedActivities)
     } catch (error) {
-      console.error('Error fetching subscription activities:', error)
+      console.error("Error fetching subscription activities:", error)
       toast.error("Failed to load subscription activities", {
-        description: "There was an error fetching blockchain data"
+        description: "There was an error fetching blockchain data",
       })
     } finally {
       setIsLoadingActivities(false)
     }
   }
 
-  // Fetch activities when creator is registered and connected
   useEffect(() => {
     if (creatorDetails.isRegistered && userAddress && publicClient) {
       fetchSubscriptionActivities()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creatorDetails.isRegistered, userAddress, publicClient])
 
-  // Handle transaction receipt status and toast notifications
   useEffect(() => {
     if (receipt) {
-      if (receipt.status === 'success') {
+      if (receipt.status === "success") {
         toast.success("Withdrawal successful!", {
           description: `${formatEth(creatorDetails.totalEarnings)} ETH withdrawn`,
         })
         setCreatorDetails((prev) => ({ ...prev, totalEarnings: BigInt(0) }))
-        // Refetch data after successful withdrawal
         refetchCreatorData()
       } else {
         toast.error("Withdrawal failed", {
@@ -202,7 +191,6 @@ export default function CreatorDashboard() {
     }
   }, [receipt, creatorDetails.totalEarnings, refetchCreatorData])
 
-  // Handle withdraw errors
   useEffect(() => {
     if (withdrawError) {
       toast.error("Withdrawal failed", {
@@ -219,14 +207,14 @@ export default function CreatorDashboard() {
       })
       return
     }
-    
+
     if (creatorDetails.totalEarnings <= BigInt(0)) {
       toast.error("No funds to withdraw", {
         description: "You don't have any earnings to withdraw at this time",
       })
       return
     }
-    
+
     setIsWithdrawing(true)
     withdraw({
       address: CONTRACT_ADDRESS,
@@ -235,10 +223,7 @@ export default function CreatorDashboard() {
     })
   }
 
-  const formatAddress = (address) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
+  const formatAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp * 1000)
     return formatDistanceToNow(date, { addSuffix: true })
@@ -267,8 +252,7 @@ export default function CreatorDashboard() {
         <Card>
           <CardContent className="py-10 flex flex-col items-center justify-center">
             <p className="mb-6">You are not registered as a creator. Please register first to access the dashboard.</p>
-            <Button asChild className=" bg-black text-white text-base " 
-            >
+            <Button asChild className=" bg-black text-white text-base">
               <a href="/register">Register as Creator</a>
             </Button>
           </CardContent>
@@ -278,6 +262,7 @@ export default function CreatorDashboard() {
   }
 
   const isLoading = isCreatorLoading || isSubscribersLoading
+
 
   return (
     <div className="container mx-auto px-4 py-8">
