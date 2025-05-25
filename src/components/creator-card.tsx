@@ -19,9 +19,7 @@ interface CreatorCardProps {
   creator: Pick<Creator, "address" | "name">
 }
 
-type CreatorStruct = readonly [string, bigint, bigint, bigint, bigint]
-
-const FALLBACK_DATA: CreatorStruct = ['', 0n, 0n, 0n, 0n]
+type CreatorStruct = readonly [string, bigint, bigint, bigint] | undefined
 
 export default function CreatorCard({ creator }: CreatorCardProps) {
   const [isSubscribing, setIsSubscribing] = useState(false)
@@ -32,12 +30,12 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     isLoading, 
     error: readError,
     refetch 
-  } = useReadContract<typeof CONTRACT_ABI, "creators", CreatorStruct>({
+  } = useReadContract({
     abi: CONTRACT_ABI, 
     address: CONTRACT_ADDRESS,
     functionName: "creators",
     args: [creator.address],
-  })
+  }) as { data: CreatorStruct; isLoading: boolean; error: Error | null; refetch: () => void }
 
   const {
     data: isSubscribed,
@@ -50,7 +48,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     query: {
       enabled: !!userAddress,
     },
-  })
+  }) as { data: boolean | undefined; refetch: () => void }
 
   const {
     writeContractAsync,
@@ -73,13 +71,11 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
     }
   }, [isSuccess, refetch, refetchSubscription])
 
-  // Safe data extraction with proper types
-  const {
-    0: creatorName = '',
-    1: subscriptionFee = 0n,
-    2: platformShareRaw = 0n,
-    3: creatorBalance = 0n
-  } = onchainData || FALLBACK_DATA
+  // Safely extract data with proper type guards
+  const creatorName = onchainData?.[0] ?? ''
+  const subscriptionFee = onchainData?.[1] ?? 0n
+  const platformShareRaw = onchainData?.[2] ?? 0n
+  const creatorBalance = onchainData?.[3] ?? 0n
 
   const platformShare = platformShareRaw ? Number(platformShareRaw) : undefined
 
@@ -162,7 +158,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
             {readError ? "Failed to load creator data" : "Creator not registered"}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            {readError ? (readError as Error).message : "This creator hasn't registered on the platform yet."}
+            {readError ? readError.message : "This creator hasn't registered on the platform yet."}
           </p>
         </CardContent>
         <CardFooter>
