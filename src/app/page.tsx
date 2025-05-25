@@ -15,7 +15,6 @@ interface Creator {
   name: string
 }
 
-// Type for the decoded event args
 interface CreatorRegisteredArgs {
   creator: string
   name: string
@@ -106,12 +105,10 @@ export default function HomePage() {
               topics: event.topics,
             })
 
-            // Type guard to ensure args exists and has the expected structure
             if (!decoded.args || !Array.isArray(decoded.args)) {
               return null
             }
 
-            // Cast to the expected type after verification
             const args = decoded.args as unknown as CreatorRegisteredArgs
             const name = args.name || `Creator ${creatorAddress.slice(2, 6)}`
             return { address: creatorAddress, name }
@@ -208,12 +205,10 @@ export default function HomePage() {
             topics: events[events.length - 1].topics,
           })
 
-          // Type guard to ensure args exists and has the expected structure
           if (!decoded.args || !Array.isArray(decoded.args)) {
             return
           }
 
-          // Cast to the expected type after verification
           const args = decoded.args as unknown as CreatorRegisteredArgs
           const name = args.name || `Creator ${userAddress.slice(2, 6)}`
           setCreators(prev => deduplicateCreators([...prev, { address: userAddress, name }]))
@@ -236,52 +231,54 @@ export default function HomePage() {
         </Alert>
       )}
 
+      <section className="py-20 text-center">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">Support your favorite creators</h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+          Subscribe to creators you love and help them continue making amazing content with direct support through
+          crypto payments.
+        </p>
+        <Link href="/register">
+          <Button className="bg-black text-white hover:bg-gray-800">
+            Register as Creator
+          </Button>
+        </Link>
+      </section>
+
       {isConnected && (
-        <section className="py-20 text-center">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">Support your favorite creators</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Subscribe to creators you love and help them continue making amazing content with direct support through
-            crypto payments.
-          </p>
-          <Link href="/register">
-            <Button className="bg-black text-white hover:bg-gray-800">
-              Register as Creator
-            </Button>
-          </Link>
-        </section>
-      )}
+        <>
+          <h2 className="text-3xl font-bold mb-8 text-center">Featured Creators</h2>
 
-      <h2 className="text-3xl font-bold mb-8 text-center">Featured Creators</h2>
-
-      {isLoading ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading creators...</p>
-        </div>
-      ) : creators.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {usingFallbackCreators && (
-            <Alert className="col-span-full mb-4">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Demo Mode</AlertTitle>
-              <AlertDescription>
-                Showing demo creators. No registered creators were found on the blockchain.
-              </AlertDescription>
-            </Alert>
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading creators...</p>
+            </div>
+          ) : creators.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {usingFallbackCreators && (
+                <Alert className="col-span-full mb-4">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Demo Mode</AlertTitle>
+                  <AlertDescription>
+                    Showing demo creators. No registered creators were found on the blockchain.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {creators.map((creator) => (
+                <CreatorCard key={creator.address.toLowerCase()} creator={creator} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Alert className="max-w-md mx-auto">
+                <Info className="h-4 w-4" />
+                <AlertTitle>No creators found</AlertTitle>
+                <AlertDescription>
+                  Be the first to register as a creator on our platform!
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
-          {creators.map((creator) => (
-            <CreatorCard key={creator.address.toLowerCase()} creator={creator} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Alert className="max-w-md mx-auto">
-            <Info className="h-4 w-4" />
-            <AlertTitle>No creators found</AlertTitle>
-            <AlertDescription>
-              Be the first to register as a creator on our platform!
-            </AlertDescription>
-            </Alert>
-        </div>
+        </>
       )}
     </section>
   )
