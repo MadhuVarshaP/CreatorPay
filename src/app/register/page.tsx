@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [contractExists, setContractExists] = useState<boolean | null>(null)
   const [contractError, setContractError] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null)
   const [detailedError, setDetailedError] = useState<string | null>(null)
   const [gasEstimate, setGasEstimate] = useState<bigint | null>(null)
@@ -407,7 +408,7 @@ export default function RegisterPage() {
               {creatorName.trim() && (
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    Preview: Your profile will show as "<strong>{creatorName.trim()}</strong>"
+                  Preview: Your profile will show as &quot;<strong>{creatorName.trim()}</strong>&quot;
                   </p>
                 </div>
               )}
