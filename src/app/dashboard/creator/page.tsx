@@ -45,6 +45,7 @@ export default function CreatorDashboard() {
   const { 
     data: subscribersData, 
     isLoading: isSubscribersLoading, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     refetch: refetchSubscribers 
   } = useReadContract({
     address: CONTRACT_ADDRESS,

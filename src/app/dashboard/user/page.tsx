@@ -21,6 +21,7 @@ export default function UserDashboard() {
   const publicClient = usePublicClient()
   const { data: walletClient } = useWalletClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [registeredCreators, setRegisteredCreators] = useState<string[]>([])
   const [creatorData, setCreatorData] = useState<
     {

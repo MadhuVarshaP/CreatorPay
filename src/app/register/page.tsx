@@ -22,19 +22,18 @@ export default function RegisterPage() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   const publicClient = usePublicClient()
-  
+
   const [fee, setFee] = useState<string>("0.01")
   const [platformShare, setPlatformShare] = useState<number>(10)
   const [creatorName, setCreatorName] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [contractExists, setContractExists] = useState<boolean | null>(null)
   const [contractError, setContractError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null)
   const [detailedError, setDetailedError] = useState<string | null>(null)
   const [gasEstimate, setGasEstimate] = useState<bigint | null>(null)
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState<boolean>(false)
 
-  // Simulate contract call to catch errors before actual transaction
   const { data: simulateData, error: simulateError } = useSimulateContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
@@ -51,35 +50,32 @@ export default function RegisterPage() {
     onSuccess: () => {
       handleRegistrationSuccess()
     },
-    onError: (error: { message: any }) => {
+    onError: (error: Error) => {
       toast.error("Transaction failed", {
         description: error?.message || "There was an error processing your transaction",
       })
     }
   })
 
-  // Handle successful registration
   const handleRegistrationSuccess = async () => {
     if (!address) return
 
     const trimmedName = creatorName.trim()
-    
+
     toast.success("Registration Successful!", {
       description: `Welcome ${trimmedName}! Your creator profile has been set up.`,
       duration: 4000,
     })
-    
-    // Redirect after a short delay
+
     setTimeout(() => {
       router.push("/dashboard/creator")
     }, 2000)
   }
 
-  // Check if user is already registered
   useEffect(() => {
     const checkRegistration = async () => {
       if (!isConnected || !publicClient || !address) return
-      
+
       try {
         const creatorData = await publicClient.readContract({
           address: CONTRACT_ADDRESS as `0x${string}`,
@@ -87,63 +83,61 @@ export default function RegisterPage() {
           functionName: "creators",
           args: [address],
         }) as [string, bigint, bigint, bigint, bigint]
-        
-        // Check if creator has a name (first field of the struct)
+
         const isRegistered = creatorData[0] && creatorData[0].length > 0
         setIsAlreadyRegistered(isRegistered)
-        
+
         if (isRegistered) {
           toast.warning("Already registered", {
-            description: `You are already registered as creator "${creatorData[0]}"`,
+            description: `You are already registered as creator \"${creatorData[0]}\"`,
             duration: 5000,
           })
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error checking registration status:", err)
         setIsAlreadyRegistered(false)
       }
     }
-    
+
     checkRegistration()
   }, [isConnected, publicClient, address])
 
-  // Contract verification
   useEffect(() => {
     const verifyContract = async () => {
       if (!isConnected || !publicClient) return
-      
+
       try {
         setContractError(null)
-        
+
         const code = await publicClient.getBytecode({ address: CONTRACT_ADDRESS as `0x${string}` })
-        
+
         if (!code || code === "0x") {
           setContractExists(false)
           setContractError(`No contract found at ${CONTRACT_ADDRESS} on network ID ${chainId}`)
           return
         }
-        
+
         setContractExists(true)
-        
+
         try {
           const owner = await publicClient.readContract({
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "owner",
           })
-          
+
           const subscriptionDuration = await publicClient.readContract({
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "subscriptionDuration",
           })
-          
+
           const totalPlatformFees = await publicClient.readContract({
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "totalPlatformFees",
           })
-          
+
           setDebugInfo({ 
             contractOwner: owner,
             subscriptionDuration: Number(subscriptionDuration),
@@ -151,26 +145,25 @@ export default function RegisterPage() {
             chainId,
             userAddress: address
           })
-          
-        } catch (err: any) {
+
+        } catch (err) {
           console.error("Error calling contract view function:", err)
-          setContractError(`Contract exists but may not be compatible. Error: ${err.message}`)
+          setContractError(`Contract exists but may not be compatible. Error: ${(err as Error).message}`)
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error verifying contract:", err)
-        setContractError(`Error verifying contract: ${err.message}`)
+        setContractError(`Error verifying contract: ${(err as Error).message}`)
         setContractExists(false)
       }
     }
-    
+
     verifyContract()
   }, [isConnected, chainId, publicClient, address])
 
-  // Gas estimation
   useEffect(() => {
     const estimateGas = async () => {
       if (!isConnected || !publicClient || !fee || !creatorName.trim() || contractExists !== true || isAlreadyRegistered) return
-      
+
       try {
         const gas = await publicClient.estimateContractGas({
           address: CONTRACT_ADDRESS as `0x${string}`,
@@ -179,13 +172,13 @@ export default function RegisterPage() {
           args: [creatorName.trim(), parseEther(fee), BigInt(platformShare)],
           account: address,
         })
-        
+
         setGasEstimate(gas)
-      } catch (err: any) {
+      } catch (err) {
         console.error("Gas estimation failed:", err)
       }
     }
-    
+
     estimateGas()
   }, [isConnected, publicClient, fee, platformShare, creatorName, contractExists, address, isAlreadyRegistered])
 
@@ -200,22 +193,21 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-  
-    // Validation checks
+
     if (!isConnected) {
       toast.error("Wallet not connected", {
         description: "Please connect your wallet to complete registration",
       })
       return
     }
-    
+
     if (isAlreadyRegistered) {
       toast.error("Already registered", {
         description: "You are already registered as a creator",
       })
       return
     }
-    
+
     if (contractError || contractExists === false) {
       toast.error("Contract issue", {
         description: contractError || "Contract not found on this network",
@@ -245,23 +237,14 @@ export default function RegisterPage() {
       })
       return
     }
-  
+
     setIsSubmitting(true)
     setDetailedError(null)
-  
+
     try {
       const toastId = toast.loading(`Registering ${trimmedName} as creator...`)
-      
+
       const feeInWei = parseEther(fee)
-      
-      console.log("🚀 Starting registration:", {
-        address: CONTRACT_ADDRESS,
-        creatorName: trimmedName,
-        fee: feeInWei.toString(),
-        platformShare: platformShare,
-        userAddress: address,
-        chainId
-      })
 
       const txHash = await writeContractAsync(
         simulateData?.request || {
@@ -269,34 +252,53 @@ export default function RegisterPage() {
           address: CONTRACT_ADDRESS as `0x${string}`,
           functionName: "registerCreator",
           args: [trimmedName, feeInWei, BigInt(platformShare)],
-          ...(gasEstimate && { gas: gasEstimate + (gasEstimate / 10n) })
+          ...(gasEstimate && { gas: gasEstimate + (gasEstimate / 10n) }),
         }
       )
-  
+      
+      toast.success("Transaction submitted", {
+        description: (
+          <span>
+            View on{" "}
+            <a
+              href={`https://etherscan.io/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-blue-500"
+            >
+              Etherscan
+            </a>
+          </span>
+        ),
+        duration: 7000,
+      })
+      
+
       toast.dismiss(toastId)
-      console.log("📝 Transaction submitted:", txHash)
-      
-    } catch (err: any) {
+
+    } catch (err) {
       console.error("❌ Registration failed:", err)
-      
+
       let errorMsg = "Registration failed. "
-      
-      if (err.cause?.reason) {
-        errorMsg += err.cause.reason
-      } else if (err.shortMessage) {
-        errorMsg += err.shortMessage
-      } else if (err.message) {
-        errorMsg += err.message
+
+      const error = err as Error & { cause?: { reason?: string }, shortMessage?: string }
+
+      if (error.cause?.reason) {
+        errorMsg += error.cause.reason
+      } else if (error.shortMessage) {
+        errorMsg += error.shortMessage
+      } else if (error.message) {
+        errorMsg += error.message
       }
-      
+
       if (errorMsg.toLowerCase().includes("already registered")) {
         errorMsg = "You are already registered as a creator."
         setIsAlreadyRegistered(true)
       } else if (errorMsg.toLowerCase().includes("user rejected")) {
         setIsSubmitting(false)
-        return // Don't show error for user rejection
+        return
       }
-      
+
       setDetailedError(errorMsg)
       toast.error("Registration failed", {
         description: errorMsg,

@@ -40,7 +40,6 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
   const {
     data: isSubscribed,
     refetch: refetchSubscription,
-    isLoading: isCheckingSub,
   } = useReadContract({
     abi: CONTRACT_ABI,
     address: CONTRACT_ADDRESS,
@@ -72,8 +71,7 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
   const subscriptionFee = onchainData?.[1]
   const platformShare = onchainData?.[2] ? Number(onchainData[2]) : undefined
   const creatorBalance = onchainData?.[3]
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const platformBalance = onchainData?.[4]
+  // const platformBalance = onchainData?.[4] 
 
   const getDisplayName = () => {
     if (creatorName && creatorName.trim().length > 0) return creatorName.trim()
@@ -101,11 +99,11 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         value: subscriptionFee,
         gasLimit: 100000,
       })
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Subscription failed:", err)
       let errorMessage = "Subscription failed"
-      if (err && typeof err === "object" && "message" in err) {
-        errorMessage += `: ${(err as any).message}`
+      if (err instanceof Error) {
+        errorMessage += `: ${err.message}`
       }
       alert(errorMessage)
     } finally {
@@ -239,6 +237,16 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
           )}
         </Button>
       </CardFooter>
+
+      {isSuccess && (
+        <CardFooter className="pt-2">
+          <div className="w-full p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-600">
+              Subscription successful!
+            </p>
+          </div>
+        </CardFooter>
+      )}
 
       {writeError && (
         <CardFooter className="pt-2">
