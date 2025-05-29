@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreatorPay
 
-## Getting Started
+CreatorPay is a decentralized subscription-based platform that allows users to support creators through recurring payments on-chain. Built with Solidity, Next.js, Tailwind CSS, and deployed using Vercel. The smart contract is deployed on the **Arbitrum Sepolia** testnet.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- On-chain creator registration and subscription logic
+- Wallet connection and transaction signing via WalletConnect/RainbowKit
+- ETH-based subscription fee with platform share split
+- Creator and platform earnings tracking
+- Fully responsive UI built with Tailwind CSS
+
+## Roles
+
+- Creator
+- User (Subscriber)
+- Admin
+
+## Tech Stack
+
+- **Smart Contract**: Solidity (deployed via Remix IDE)
+- **Blockchain Network**: Arbitrum Sepolia
+- **Frontend**: Next.js (App Router)
+- **Styling**: Tailwind CSS
+- **Wallet Integration**: wagmi + RainbowKit
+- **Deployment**: Vercel
+
+## Project Structure
+
+```
+/app - Next.js app pages
+/components - UI components
+/lib
+/contract - Contract ABI and address
+/utils - Utility functions (e.g. ETH formatting)
+/types - TypeScript interfaces
+/public - Static assets
+/styles - Tailwind config and globals
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Contract Details
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Network**: Arbitrum Sepolia Testnet
+- **Contract Address**: `0xe893b73f1339C4F40747F660FC1188aA26976e5c`
+- **Deployed With**: [Remix IDE](https://remix.ethereum.org)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Screenshots
 
-## Learn More
+<img width="1467" alt="Screenshot 2025-05-29 at 9 20 17 AM" src="https://github.com/user-attachments/assets/2470c74a-c4e0-439b-aa53-e0047bed1270" />
+<img width="1470" alt="Screenshot 2025-05-29 at 9 20 40 AM" src="https://github.com/user-attachments/assets/12157063-b129-4dd4-b1dd-3a5086272560" />
+<img width="1469" alt="Screenshot 2025-05-29 at 9 20 53 AM" src="https://github.com/user-attachments/assets/08379955-e81c-4a4e-ac80-88bf9cef9c09" />
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Running Locally
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+git clone https://github.com/MadhuVarshaP/CreatorPay.git
+cd CreatorPay
+npm install
+npm run dev
+```
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Deploy on Vercel
+### Environment Variables
+Create a .env.local file in the root and add:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+```
+⚠️ Ensure you’re connected to Arbitrum Sepolia in your wallet.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+Deployed this CreatorPay project in Vercel [https://creator-pay-subscribe.vercel.app/](https://creator-pay-subscribe.vercel.app/)
