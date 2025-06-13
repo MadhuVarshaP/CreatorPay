@@ -101,7 +101,6 @@ export default function AdminDashboard() {
           functionName: 'getRegisteredCreators',
         }) as string[]
 
-        // Fetch detailed information for each creator
         const creatorDetails: CreatorData[] = []
 
         for (const creatorAddr of creatorAddresses) {
@@ -111,7 +110,7 @@ export default function AdminDashboard() {
               address: CONTRACT_ADDRESS,
               functionName: 'creators',
               args: [creatorAddr],
-            }) as [string, bigint, bigint, bigint, bigint] // [name, subscriptionFee, platformShare, creatorBalance, platformBalance]
+            }) as [string, bigint, bigint, bigint, bigint] 
 
             const [name, subscriptionFee, platformShare, creatorBalance, platformBalance] = creator
 
@@ -125,7 +124,6 @@ export default function AdminDashboard() {
             })
           } catch (err) {
             console.error(`Error fetching creator ${creatorAddr}:`, err)
-            // Continue with other creators even if one fails
           }
         }
 
@@ -166,7 +164,7 @@ export default function AdminDashboard() {
       })
 
       toast.success('Withdrawal successful', {
-        description: `Successfully withdrew ${formatEther(totalPlatformFees)} ETH`
+        description: `Successfully withdraw ${formatEther(totalPlatformFees)} ETH`
       })
 
       // Refresh data after successful withdrawal
