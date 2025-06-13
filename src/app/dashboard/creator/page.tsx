@@ -323,7 +323,7 @@ export default function CreatorDashboard() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Address</p>
-              <p className="font-mono text-md">{userAddress}</p>
+              <p className="font-mono text-md">{userAddress ? formatAddress(userAddress) : ''}</p>
             </div>
             {isLoading ? (
               <>

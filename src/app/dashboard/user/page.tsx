@@ -40,6 +40,10 @@ export default function UserDashboard() {
   const [creatorData, setCreatorData] = useState<CreatorData[]>([])
   const [processing, setProcessing] = useState<string | null>(null)
 
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+
   useEffect(() => {
     if (!isConnected) {
       toast.warning("Wallet required", {
@@ -189,7 +193,7 @@ export default function UserDashboard() {
                         </Badge>
                       )}
                     </div>
-                    <p className="font-mono text-xs text-muted-foreground">{creator.address}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{formatAddress(creator.address)}</p>
                     <p className="text-sm mt-1">{formatEth(creator.fee)} ETH / month</p>
                     {isSubscribed && (
                       <p className="text-sm text-muted-foreground">Renews in {daysLeft} days</p>
