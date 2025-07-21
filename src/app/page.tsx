@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { publicClient, decodeEventLog } from "@/lib/viem"
+import { publicClient, decodeEventLog, getLogsPaginated } from "@/lib/viem"
 
 interface Creator {
   address: string
@@ -78,7 +78,7 @@ export default function HomePage() {
       if (!contractVerified) return
 
       try {
-        const events = await publicClient.getLogs({
+        const events = await getLogsPaginated({
           address: CONTRACT_ADDRESS as `0x${string}`,
           event: {
             type: "event",
@@ -179,7 +179,7 @@ export default function HomePage() {
       if (!userAddress || !isConnected || !contractVerified) return
 
       try {
-        const events = await publicClient.getLogs({
+        const events = await getLogsPaginated({
           address: CONTRACT_ADDRESS as `0x${string}`,
           event: {
             type: "event",

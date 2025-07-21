@@ -22,6 +22,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDistanceToNow } from "date-fns"
+import { getLogsPaginated, decodeEventLog } from '@/lib/viem'
 
 interface CreatorDetails {
   name: string
@@ -140,7 +141,7 @@ export default function CreatorDashboard() {
     setIsLoadingActivities(true)
     try {
       // Get subscription events for this creator
-      const logs = await publicClient.getLogs({
+      const logs = await getLogsPaginated({
         address: CONTRACT_ADDRESS,
         event: {
           type: 'event',
@@ -161,20 +162,36 @@ export default function CreatorDashboard() {
       // Process logs to get subscription activities
       const activities = await Promise.all(
         logs.map(async (log) => {
+          // Decode the log to get args
+          const decoded = decodeEventLog({
+            abi: CONTRACT_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+          let args: { user: string; creator: string; expiresAt: bigint };
+          if (Array.isArray(decoded.args)) {
+            // fallback: [user, creator, expiresAt]
+            const [user, creator, expiresAt] = decoded.args as unknown as [string, string, bigint];
+            args = { user, creator, expiresAt };
+          } else if (decoded.args) {
+            args = decoded.args as { user: string; creator: string; expiresAt: bigint };
+          } else {
+            return null;
+          }
+
           // Get block details for timestamp
           const block = await publicClient.getBlock({
             blockHash: log.blockHash
           })
-          
           // Get transaction details for amount paid
           const transaction = await publicClient.getTransaction({
             hash: log.transactionHash
           })
 
           return {
-            subscriber: log.args.user as string,
-            creator: log.args.creator as string,
-            expiresAt: log.args.expiresAt as bigint,
+            subscriber: args.user,
+            creator: args.creator,
+            expiresAt: args.expiresAt,
             timestamp: Number(block.timestamp),
             blockNumber: Number(log.blockNumber),
             transactionHash: log.transactionHash,
@@ -185,7 +202,8 @@ export default function CreatorDashboard() {
       )
 
       // Sort by timestamp (most recent first)
-      const sortedActivities = activities.sort((a, b) => b.timestamp - a.timestamp)
+      const validActivities = activities.filter(Boolean) as SubscriptionActivity[];
+      const sortedActivities = validActivities.sort((a, b) => b.timestamp - a.timestamp)
       setSubscriptionActivities(sortedActivities)
     } catch (error) {
       console.error('Error fetching subscription activities:', error)
