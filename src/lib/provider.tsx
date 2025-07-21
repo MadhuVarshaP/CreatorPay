@@ -5,14 +5,7 @@ import {
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import {
-  mainnet,
-  polygon,
-  optimism,
-  arbitrum,
-  base,
-  arbitrumSepolia
-} from 'wagmi/chains';
+import { base, baseSepolia } from 'wagmi/chains';
 import {
   QueryClientProvider,
   QueryClient,
@@ -22,7 +15,7 @@ import { ReactNode } from 'react';
 const config = getDefaultConfig({
   appName: 'CreatorPay',
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
-  chains: [mainnet, polygon, optimism, arbitrum, base, arbitrumSepolia],
+  chains: [base, baseSepolia],
   ssr: true, 
 });
 

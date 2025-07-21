@@ -4,9 +4,9 @@ export { decodeEventLog };
 
 import { defineChain } from "viem"
 
-const arbitrumSepolia = defineChain({
-  id: 421614,
-  name: "Arbitrum Sepolia",
+const baseSepolia = defineChain({
+  id: 84532,
+  name: "Base Sepolia",
   nativeCurrency: {
     name: "Ethereum",
     symbol: "ETH",
@@ -14,18 +14,18 @@ const arbitrumSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://sepolia-rollup.arbitrum.io/rpc"],
+      http: ["https://sepolia.base.org"],
     },
   },
   blockExplorers: {
     default: {
-      name: "Arbiscan",
-      url: "https://sepolia.arbiscan.io",
+      name: "Basescan",
+      url: "https://sepolia.basescan.org",
     },
   },
 })
 
 export const publicClient = createPublicClient({
-  chain: arbitrumSepolia,
+  chain: baseSepolia,
   transport: http(),
 })

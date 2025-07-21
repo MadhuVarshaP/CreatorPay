@@ -275,12 +275,12 @@ export default function RegisterPage() {
           <span>
             View on{" "}
             <a
-              href={`https://sepolia.arbiscan.io/tx/${txHash}`}
+              href={`https://sepolia.basescan.org/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="underline text-blue-500"
             >
-              Arbiscan
+              Basescan
             </a>
           </span>
         ),
