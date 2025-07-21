@@ -174,7 +174,8 @@ export default function CreatorDashboard() {
             const [user, creator, expiresAt] = decoded.args as unknown as [string, string, bigint];
             args = { user, creator, expiresAt };
           } else if (decoded.args) {
-            args = decoded.args as { user: string; creator: string; expiresAt: bigint };
+            // @ts-ignore: args may be array or object depending on viem version
+            args = decoded.args as unknown as { user: string; creator: string; expiresAt: bigint };
           } else {
             return null;
           }
