@@ -68,7 +68,7 @@ export default function RegisterPage() {
     if (isSuccess && hash) {
       handleRegistrationSuccess()
     }
-  }, [isSuccess, hash, address])
+  }, [isSuccess, hash, address, handleRegistrationSuccess])
 
   // Handle transaction error
   useEffect(() => {
