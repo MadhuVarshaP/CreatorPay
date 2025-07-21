@@ -95,6 +95,16 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
       return
     }
 
+    // Log all parameters before sending the contract call
+    console.log({
+      contract: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: "subscribe",
+      args: [creator.address],
+      value: subscriptionFee,
+      user: userAddress,
+    })
+
     setIsSubscribing(true)
     try {
       await writeContractAsync({
@@ -105,10 +115,19 @@ export default function CreatorCard({ creator }: CreatorCardProps) {
         value: subscriptionFee,
       })
     } catch (err) {
+      // Enhanced error handling
       console.error("Subscription failed:", err)
       let errorMessage = "Subscription failed"
-      if (err instanceof Error) {
+      if (err && typeof err === "object" && "message" in err) {
         errorMessage += `: ${err.message}`
+      } else if (typeof err === "string") {
+        errorMessage += `: ${err}`
+      } else {
+        try {
+          errorMessage += `: ${JSON.stringify(err)}`
+        } catch {
+          errorMessage += ": [Unserializable error object]"
+        }
       }
       alert(errorMessage)
     } finally {

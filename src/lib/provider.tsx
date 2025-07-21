@@ -11,7 +11,6 @@ import {
   optimism,
   arbitrum,
   base,
-  polygonAmoy,
   arbitrumSepolia
 } from 'wagmi/chains';
 import {
@@ -21,9 +20,9 @@ import {
 import { ReactNode } from 'react';
 
 const config = getDefaultConfig({
-  appName: 'My RainbowKit App',
-  projectId: '8e000855fac35d6427f4c731b6089f97D', 
-  chains: [mainnet, polygon, optimism, arbitrum, base, polygonAmoy, arbitrumSepolia],
+  appName: 'CreatorPay',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+  chains: [mainnet, polygon, optimism, arbitrum, base, arbitrumSepolia],
   ssr: true, 
 });
 
